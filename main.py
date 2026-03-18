@@ -1,0 +1,293 @@
+import os
+import time
+import requests
+import pandas as pd
+import yfinance as yf
+from datetime import datetime
+from dotenv import load_dotenv
+from typing import Optional
+from concurrent.futures import ThreadPoolExecutor, as_completed
+
+load_dotenv()
+
+TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
+TELEGRAM_CHAT_ID   = os.getenv("TELEGRAM_CHAT_ID")
+
+# ── IDX top liquid emitens ─────────────────────────────────────────────────────
+IDX_TICKERS = [
+    "BBCA", "BBRI", "BMRI", "BBNI", "BRIS",
+    "TLKM", "ASII", "UNVR", "ICBP", "INDF",
+    "GOTO", "BYAN", "ADRO", "PTBA", "ITMG",
+    "ANTM", "TINS", "INCO", "MDKA", "HRUM",
+    "CPIN", "JPFA", "MAIN", "TBIG", "TOWR",
+    "EXCL", "ISAT", "SMGR", "INTP",
+    "KLBF", "SIDO", "MIKA", "HEAL", "SILO",
+    "PWON", "BSDE", "CTRA", "LPKR", "SMRA",
+    "AKRA", "ESSA", "PGAS", "MEDC", "ELSA",
+    "MTEL", "FILM", "ACES", "MAPI", "LPPF",
+    "HMSP", "GGRM", "WIIM", "AMRT", "MIDI",
+]
+
+YFINANCE_SUFFIX = ".JK"
+MAX_WORKERS     = 10   # concurrent yfinance threads
+MAX_RETRIES     = 2
+
+
+def get_ticker_data(ticker: str, retries: int = MAX_RETRIES) -> Optional[dict]:
+    """Fetch OHLCV + derived metrics for a single ticker via yfinance, with retries."""
+    for attempt in range(1, retries + 2):
+        try:
+            tk   = yf.Ticker(ticker + YFINANCE_SUFFIX)
+            hist = tk.history(period="20d")
+            if hist.empty or len(hist) < 6:
+                return None
+
+            today      = hist.iloc[-1]
+            prev       = hist.iloc[-2]
+            close      = today["Close"]
+            prev_close = prev["Close"]
+
+            avg_vol_10  = hist["Volume"].iloc[-11:-1].mean()
+            vol_ratio   = today["Volume"] / avg_vol_10 if avg_vol_10 > 0 else 0
+            pct_change  = ((close - prev_close) / prev_close) * 100 if prev_close > 0 else 0
+            tx_value_bn = (today["Volume"] * close) / 1_000_000_000  # billion IDR
+
+            return {
+                "ticker":      ticker,
+                "close":       close,
+                "pct_change":  pct_change,
+                "volume":      today["Volume"],
+                "avg_vol_10d": avg_vol_10,
+                "vol_ratio":   vol_ratio,
+                "tx_value_bn": tx_value_bn,
+            }
+        except Exception as e:
+            if attempt <= retries:
+                time.sleep(1)
+            else:
+                print(f"[WARN] {ticker} failed after {retries + 1} attempts: {e}")
+                return None
+
+
+def fetch_all_tickers() -> list[dict]:
+    """Fetch all IDX tickers concurrently using a thread pool."""
+    results = []
+    with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
+        futures = {executor.submit(get_ticker_data, t): t for t in IDX_TICKERS}
+        for future in as_completed(futures):
+            data = future.result()
+            if data:
+                results.append(data)
+    return results
+
+
+# IDX endpoints to try in order
+_IDX_ENDPOINTS = [
+    "https://www.idx.co.id/umbraco/Surface/StockData/GetStockSummary",
+    "https://www.idx.co.id/primary/TradingSummary/GetStockSummary",
+]
+
+_IDX_HEADERS = {
+    "User-Agent":      (
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+        "AppleWebKit/537.36 (KHTML, like Gecko) "
+        "Chrome/124.0.0.0 Safari/537.36"
+    ),
+    "Accept":          "application/json, text/plain, */*",
+    "Accept-Language": "en-US,en;q=0.9,id;q=0.8",
+    "Accept-Encoding": "gzip, deflate, br",
+    "Referer":         "https://www.idx.co.id/id/data-pasar/data-saham/ringkasan-perdagangan-saham/",
+    "Origin":          "https://www.idx.co.id",
+    "Connection":      "keep-alive",
+    "DNT":             "1",
+}
+
+
+def _make_idx_session() -> requests.Session:
+    """Create a session with IDX cookies by visiting the homepage first."""
+    session = requests.Session()
+    session.headers.update(_IDX_HEADERS)
+    try:
+        session.get("https://www.idx.co.id/", timeout=10)
+    except Exception:
+        pass  # best-effort warm-up
+    return session
+
+
+def fetch_idx_foreign_flow() -> pd.DataFrame:
+    """
+    Fetch net foreign buy/sell from IDX public API.
+    Uses a session + homepage warm-up to bypass 403 bot protection.
+    Tries multiple endpoints. Returns an empty DataFrame on failure.
+    """
+    session = _make_idx_session()
+    params  = {"start": 0, "length": 9999, "draw": 1}
+
+    rows = []
+    for url in _IDX_ENDPOINTS:
+        try:
+            resp = session.get(url, params=params, timeout=15)
+            resp.raise_for_status()
+            data = resp.json()
+            rows = data.get("data", [])
+            if rows:
+                print(f"[INFO] IDX foreign flow fetched from: {url}")
+                break
+        except Exception as e:
+            print(f"[WARN] IDX endpoint {url} failed: {e}")
+            continue
+
+    if not rows:
+        print("[WARN] All IDX endpoints failed — foreign flow unavailable.")
+        return pd.DataFrame()
+
+    df = pd.DataFrame(rows)
+    col_map = {
+        "StockCode":   "ticker",
+        "ForeignBuy":  "foreign_buy",
+        "ForeignSell": "foreign_sell",
+        "Close":       "close_idx",
+        "Volume":      "volume_idx",
+        "Value":       "value_idx",
+    }
+    df = df.rename(columns={k: v for k, v in col_map.items() if k in df.columns})
+
+    for col in ["foreign_buy", "foreign_sell", "value_idx"]:
+        if col in df.columns:
+            df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0)
+
+    if "foreign_buy" in df.columns and "foreign_sell" in df.columns:
+        df["net_foreign"]    = df["foreign_buy"] - df["foreign_sell"]
+        df["net_foreign_bn"] = df["net_foreign"] / 1_000_000_000
+
+    if "value_idx" in df.columns:
+        df["tx_value_bn"] = df["value_idx"] / 1_000_000_000
+
+    return df
+
+
+def build_report() -> str:
+    """Assemble the full screening report."""
+    today_str = datetime.now().strftime("%d %b %Y %H:%M WIB")
+    lines = [f"📊 *IDX Daily Screener — {today_str}*\n"]
+
+    # ── 1. FETCH ALL TICKERS CONCURRENTLY (yfinance — always reliable) ────────
+    print(f"[INFO] Fetching {len(IDX_TICKERS)} tickers concurrently...")
+    all_data = fetch_all_tickers()
+    all_data_sorted_val = sorted(all_data, key=lambda x: x["tx_value_bn"], reverse=True)
+
+    # ── 2. TOP TRANSACTION VALUE (from yfinance) ──────────────────────────────
+    lines.append("💰 *TOP 10 NILAI TRANSAKSI (IDR Miliar)*")
+    for d in all_data_sorted_val[:10]:
+        arrow = "🔺" if d["pct_change"] >= 0 else "🔻"
+        lines.append(
+            f"  {arrow} `{d['ticker']:<6}` {d['tx_value_bn']:.1f}B"
+            f"  |  {d['pct_change']:+.1f}%"
+        )
+    lines.append("")
+
+    # ── 3. FOREIGN FLOW from IDX (best-effort) ───────────────────────────────
+    df_idx = fetch_idx_foreign_flow()
+
+    if not df_idx.empty and "net_foreign_bn" in df_idx.columns:
+        top_foreign = (
+            df_idx[["ticker", "net_foreign_bn", "tx_value_bn"]]
+            .sort_values("net_foreign_bn", ascending=False)
+            .head(10)
+        )
+        bot_foreign = (
+            df_idx[["ticker", "net_foreign_bn", "tx_value_bn"]]
+            .sort_values("net_foreign_bn", ascending=True)
+            .head(5)
+        )
+
+        lines.append("🟢 *TOP 10 NET FOREIGN BUY (IDR Miliar)*")
+        for _, r in top_foreign.iterrows():
+            sign = "+" if r["net_foreign_bn"] >= 0 else ""
+            lines.append(
+                f"  `{r['ticker']:<6}` Net {sign}{r['net_foreign_bn']:.1f}B"
+                f"  |  Val {r.get('tx_value_bn', 0):.1f}B"
+            )
+
+        lines.append("\n🔴 *TOP 5 NET FOREIGN SELL*")
+        for _, r in bot_foreign.iterrows():
+            lines.append(
+                f"  `{r['ticker']:<6}` Net {r['net_foreign_bn']:.1f}B"
+                f"  |  Val {r.get('tx_value_bn', 0):.1f}B"
+            )
+        lines.append("")
+
+
+    lines.append("⚡ *UNUSUAL VOLUME (Vol > 3× rata-rata 10 hari)*")
+    unusual = [d for d in all_data if d["vol_ratio"] >= 3.0]
+
+    if unusual:
+        unusual.sort(key=lambda x: x["vol_ratio"], reverse=True)
+        for d in unusual[:15]:
+            arrow = "🔺" if d["pct_change"] >= 0 else "🔻"
+            lines.append(
+                f"  {arrow} `{d['ticker']:<6}` "
+                f"{d['pct_change']:+.1f}%  "
+                f"Vol×{d['vol_ratio']:.1f}  "
+                f"Val {d['tx_value_bn']:.1f}B"
+            )
+    else:
+        lines.append("  _Tidak ada unusual volume hari ini._")
+    lines.append("")
+
+    # ── 5. TOP GAINERS & LOSERS ───────────────────────────────────────────────
+    if all_data:
+        sorted_by_pct = sorted(all_data, key=lambda x: x["pct_change"], reverse=True)
+
+        lines.append("🔺 *TOP 5 GAINERS*")
+        for d in sorted_by_pct[:5]:
+            lines.append(
+                f"  `{d['ticker']:<6}` {d['pct_change']:+.2f}%"
+                f"  |  Close {d['close']:,.0f}"
+                f"  |  Val {d['tx_value_bn']:.1f}B"
+            )
+        lines.append("")
+
+        lines.append("🔻 *TOP 5 LOSERS*")
+        for d in sorted_by_pct[-5:][::-1]:
+            lines.append(
+                f"  `{d['ticker']:<6}` {d['pct_change']:+.2f}%"
+                f"  |  Close {d['close']:,.0f}"
+                f"  |  Val {d['tx_value_bn']:.1f}B"
+            )
+        lines.append("")
+
+    lines.append(
+        "📌 _Data: Yahoo Finance (+ IDX jika tersedia). "
+        "Bukan rekomendasi beli/jual. DYOR._"
+    )
+    return "\n".join(lines)
+
+
+def send_telegram(message: str):
+    """Send message to Telegram. Splits if over 4096 chars."""
+    url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
+    # Telegram message limit is 4096 chars
+    chunks = [message[i:i+4096] for i in range(0, len(message), 4096)]
+    for chunk in chunks:
+        payload = {
+            "chat_id":                  TELEGRAM_CHAT_ID,
+            "text":                     chunk,
+            "parse_mode":               "Markdown",
+            "disable_web_page_preview": True,
+        }
+        resp = requests.post(url, json=payload, timeout=15)
+        resp.raise_for_status()
+    print(f"[OK] Telegram sent — {len(chunks)} message(s)")
+
+
+def run():
+    print(f"[{datetime.now().strftime('%H:%M:%S')}] Building report...")
+    report = build_report()
+    print(report)
+    print("\n[INFO] Sending to Telegram...")
+    send_telegram(report)
+
+
+if __name__ == "__main__":
+    run()
