@@ -32,6 +32,32 @@ YFINANCE_SUFFIX = ".JK"
 MAX_WORKERS     = 10   # concurrent yfinance threads
 MAX_RETRIES     = 2
 
+# ── Sector mapping for Big Player analysis ─────────────────────────────────────
+SECTOR_MAP = {
+    "BBCA": "Banking",  "BBRI": "Banking",  "BMRI": "Banking",
+    "BBNI": "Banking",  "BRIS": "Banking",
+    "TLKM": "Telco",    "EXCL": "Telco",    "ISAT": "Telco",    "MTEL": "Telco",
+    "UNVR": "Consumer", "ICBP": "Consumer", "INDF": "Consumer",
+    "GOTO": "Tech",
+    "BYAN": "Coal",     "ADRO": "Coal",     "PTBA": "Coal",
+    "ITMG": "Coal",     "HRUM": "Coal",
+    "ANTM": "Mining",   "TINS": "Mining",   "INCO": "Mining",   "MDKA": "Mining",
+    "ASII": "Industrial",
+    "CPIN": "Agri",     "JPFA": "Agri",     "MAIN": "Agri",
+    "TBIG": "Tower",    "TOWR": "Tower",
+    "SMGR": "Cement",   "INTP": "Cement",
+    "KLBF": "Health",   "SIDO": "Health",   "MIKA": "Health",
+    "HEAL": "Health",   "SILO": "Health",
+    "PWON": "Property", "BSDE": "Property", "CTRA": "Property",
+    "LPKR": "Property", "SMRA": "Property",
+    "AKRA": "Energy",   "ESSA": "Energy",   "PGAS": "Energy",
+    "MEDC": "Energy",   "ELSA": "Energy",
+    "ACES": "Retail",   "MAPI": "Retail",   "LPPF": "Retail",
+    "AMRT": "Retail",   "MIDI": "Retail",
+    "HMSP": "Tobacco",  "GGRM": "Tobacco",  "WIIM": "Tobacco",
+    "FILM": "Media",
+}
+
 
 def get_ticker_data(ticker: str, retries: int = MAX_RETRIES) -> Optional[dict]:
     """Fetch OHLCV + derived metrics for a single ticker via yfinance, with retries."""
@@ -166,6 +192,146 @@ def fetch_idx_foreign_flow() -> pd.DataFrame:
     return df
 
 
+def generate_big_player_insight(all_data: list[dict], unusual: list[dict]) -> str:
+    """Generate Big Player analysis appended below the raw screener data."""
+    if not all_data:
+        return ""
+
+    top_val = sorted(all_data, key=lambda x: x["tx_value_bn"], reverse=True)[:10]
+
+    # ── STEP 1: Big Player Detection ──────────────────────────────────────────
+    akumulasi: list[dict] = []
+    markup:    list[dict] = []
+    distribusi: list[dict] = []
+    for d in top_val:
+        pct = d["pct_change"]
+        if pct > 5.0:
+            markup.append(d)
+        elif pct < -2.0:
+            distribusi.append(d)
+        else:
+            akumulasi.append(d)
+
+    # ── STEP 2: Sector value aggregation ──────────────────────────────────────
+    sector_value: dict[str, float] = {}
+    for d in all_data:
+        sector = SECTOR_MAP.get(d["ticker"], "Other")
+        sector_value[sector] = sector_value.get(sector, 0) + d["tx_value_bn"]
+    top_sectors = sorted(sector_value.items(), key=lambda x: x[1], reverse=True)
+
+    # Dominant sectors among top-10-value stocks (preserve insertion order)
+    bp_sectors: list[str] = []
+    for d in top_val[:5]:
+        s = SECTOR_MAP.get(d["ticker"], "Other")
+        if s not in bp_sectors:
+            bp_sectors.append(s)
+    bp_sectors = bp_sectors[:2]
+
+    # ── STEP 3: Volume validation ──────────────────────────────────────────────
+    vol_confirmed = len(unusual) >= 3
+
+    # ── STEP 4 & 5: Momentum + Market condition ───────────────────────────────
+    avg_pct   = sum(d["pct_change"] for d in all_data) / len(all_data)
+    gainers   = [d for d in all_data if d["pct_change"] > 0]
+    high_risk = [d for d in all_data if d["pct_change"] > 10]
+    broad_positive = len(gainers) > len(all_data) * 0.6
+
+    if avg_pct > 1.5:
+        market_label = "Bullish"
+    elif avg_pct > 0.3:
+        market_label = "Bullish ringan"
+    elif avg_pct > -0.5:
+        market_label = "Sideways"
+    else:
+        market_label = "Weak"
+
+    # ── Risk classification ────────────────────────────────────────────────────
+    if high_risk and not vol_confirmed:
+        risk_level  = "Tinggi"
+        risk_reason = "Ada saham +10% tanpa dukungan unusual volume → pergerakan belum terkonfirmasi"
+    elif markup and vol_confirmed:
+        risk_level  = "Sedang"
+        risk_reason = "Markup terkonfirmasi volume, tapi momentum sudah berjalan — jangan late entry"
+    elif not vol_confirmed:
+        risk_level  = "Sedang"
+        risk_reason = "Tidak ada unusual volume yang cukup → pergerakan belum fully confirmed"
+    else:
+        risk_level  = "Rendah"
+        risk_reason = "Volume mendukung, pola akumulasi terkonfirmasi"
+
+    # ── Build lines ────────────────────────────────────────────────────────────
+    L = ["", "---", ""]
+
+    L.append("🧠 *Big Player Insight*")
+    sectors_str = " & ".join(bp_sectors) if bp_sectors else "belum jelas"
+    L.append(f"- Big player terlihat masuk di: *{sectors_str}*")
+
+    if akumulasi:
+        L.append("- Kandidat akumulasi:")
+        for d in akumulasi[:3]:
+            L.append(
+                f"  - `{d['ticker']}` → value {d['tx_value_bn']:.1f}B, "
+                f"naik tipis {d['pct_change']:+.1f}% _(indikasi serap supply)_"
+            )
+
+    if markup:
+        L.append("- Kandidat markup:")
+        for d in markup[:3]:
+            L.append(
+                f"  - `{d['ticker']}` → naik {d['pct_change']:+.1f}% "
+                f"dengan value {d['tx_value_bn']:.1f}B _(big move confirmed)_"
+            )
+
+    if distribusi:
+        L.append("- Kandidat distribusi:")
+        for d in distribusi[:3]:
+            L.append(
+                f"  - `{d['ticker']}` → turun {d['pct_change']:+.1f}% "
+                f"dengan value {d['tx_value_bn']:.1f}B _(waspadai tekanan jual)_"
+            )
+
+    # Extra pattern intelligence
+    if len(akumulasi) >= 3:
+        L.append("- ⚠️ _Banyak saham value besar tapi naik kecil → kemungkinan akumulasi luas_")
+    if broad_positive and avg_pct > 0:
+        L.append("- 📈 _Mayoritas saham hijau → indikasi risk-on market_")
+    if high_risk:
+        tickers_str = ", ".join(f"`{d['ticker']}`" for d in high_risk[:3])
+        L.append(f"- 🚨 _Top gainers terlalu tinggi ({tickers_str}) → potensi trap, jangan kejar_")
+
+    L += ["", "---", ""]
+    L.append("🔄 *Market Behavior*")
+    risk_on_tag = "  _(risk-on)_" if broad_positive and avg_pct > 0 else ""
+    L.append(f"- Kondisi: *{market_label}*{risk_on_tag}")
+    if len(top_sectors) >= 2:
+        rotation = f"{top_sectors[0][0]} → {top_sectors[1][0]}"
+    else:
+        rotation = "belum terlihat jelas"
+    L.append(f"- Rotasi sektor: {rotation}")
+
+    L += ["", "---", ""]
+    L.append("⚠️ *Risk Level*")
+    L.append(f"- *{risk_level}*")
+    L.append(f"- {risk_reason}")
+
+    L += ["", "---", ""]
+    L.append("🎯 *Action Plan*")
+    focus = [d["ticker"] for d in akumulasi[:2]] + [
+        d["ticker"] for d in markup if d["pct_change"] < 8
+    ][:1]
+    L.append("- Fokus: " + (", ".join(f"`{t}`" for t in focus[:4]) if focus else "-"))
+
+    strategy = "Buy on pullback, jangan kejar harga hijau"
+    if not vol_confirmed:
+        strategy += " — tunggu konfirmasi volume dulu"
+    L.append(f"- Strategi: {strategy}")
+
+    avoid = [d["ticker"] for d in high_risk[:3]] + [d["ticker"] for d in distribusi[:2]]
+    L.append("- Hindari: " + (", ".join(f"`{t}`" for t in avoid[:5]) if avoid else "Belum ada yang perlu dihindari"))
+
+    return "\n".join(L)
+
+
 def build_report() -> str:
     """Assemble the full screening report."""
     today_str = datetime.now().strftime("%d %b %Y %H:%M WIB")
@@ -261,6 +427,10 @@ def build_report() -> str:
         "📌 _Data: Yahoo Finance (+ IDX jika tersedia). "
         "Bukan rekomendasi beli/jual. DYOR._"
     )
+
+    # ── Big Player Insight analysis (appended below raw data) ─────────────────
+    lines.append(generate_big_player_insight(all_data, unusual))
+
     return "\n".join(lines)
 
 
