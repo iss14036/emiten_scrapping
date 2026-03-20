@@ -3,10 +3,15 @@ import time
 import requests
 import pandas as pd
 import yfinance as yf
+import json
 from datetime import datetime
 from dotenv import load_dotenv
 from typing import Optional
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from pathlib import Path
+
+LOG_PATH = Path("data/logs.json")
+LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
 
 load_dotenv()
 
@@ -331,6 +336,94 @@ def generate_big_player_insight(all_data: list[dict], unusual: list[dict]) -> st
 
     return "\n".join(L)
 
+def load_logs() -> dict:
+    if LOG_PATH.exists():
+        try:
+            with open(LOG_PATH, "r") as f:
+                return json.load(f)
+        except:
+            return {}
+    return {}
+
+
+def save_today_log(all_data: list[dict]):
+    logs = load_logs()
+    today = datetime.now().strftime("%Y-%m-%d")
+
+    # simpan hanya field penting
+    logs[today] = [
+        {
+            "ticker": d["ticker"],
+            "tx_value_bn": d["tx_value_bn"],
+            "pct_change": d["pct_change"],
+            "vol_ratio": d["vol_ratio"],
+        }
+        for d in all_data
+    ]
+
+    with open(LOG_PATH, "w") as f:
+        json.dump(logs, f, indent=2)
+
+
+def get_prev_day_data() -> Optional[list[dict]]:
+    logs = load_logs()
+    dates = sorted(logs.keys())
+    if len(dates) < 2:
+        return None
+    return logs[dates[-2]]
+
+def generate_day_comparison(all_data: list[dict]) -> str:
+    prev_data = get_prev_day_data()
+    if not prev_data:
+        return ""
+
+    prev_map = {d["ticker"]: d for d in prev_data}
+
+    lines = ["", "---", "", "📊 *DAY-TO-DAY COMPARISON*"]
+
+    insights = []
+
+    for d in all_data:
+        ticker = d["ticker"]
+        prev = prev_map.get(ticker)
+
+        if not prev:
+            continue
+
+        # Value naik signifikan
+        if d["tx_value_bn"] > prev["tx_value_bn"] * 1.2:
+            insights.append(
+                f"🔼 `{ticker}` → Value naik signifikan "
+                f"({prev['tx_value_bn']:.0f}B → {d['tx_value_bn']:.0f}B)"
+            )
+
+        # Flat → naik (markup start)
+        if abs(prev["pct_change"]) < 1 and d["pct_change"] > 3:
+            insights.append(
+                f"🚀 `{ticker}` → Mulai markup ({prev['pct_change']:+.1f}% → {d['pct_change']:+.1f}%)"
+            )
+
+        # Naik → turun (distribusi)
+        if prev["pct_change"] > 3 and d["pct_change"] < 0:
+            insights.append(
+                f"⚠️ `{ticker}` → Potensi distribusi ({prev['pct_change']:+.1f}% → {d['pct_change']:+.1f}%)"
+            )
+
+        # Volume meningkat
+        if d["vol_ratio"] > prev["vol_ratio"] * 1.5:
+            insights.append(
+                f"📈 `{ticker}` → Aktivitas volume meningkat "
+                f"(Vol×{prev['vol_ratio']:.1f} → Vol×{d['vol_ratio']:.1f})"
+            )
+
+    if not insights:
+        lines.append("_Tidak ada perubahan signifikan dibanding hari sebelumnya._")
+    else:
+        for i in insights[:10]:
+            lines.append(f"  {i}")
+
+    return "\n".join(lines)
+
 
 def build_report() -> str:
     """Assemble the full screening report."""
@@ -430,6 +523,7 @@ def build_report() -> str:
 
     # ── Big Player Insight analysis (appended below raw data) ─────────────────
     lines.append(generate_big_player_insight(all_data, unusual))
+    lines.append(generate_day_comparison(all_data))
 
     return "\n".join(lines)
 
@@ -455,6 +549,11 @@ def run():
     print(f"[{datetime.now().strftime('%H:%M:%S')}] Building report...")
     report = build_report()
     print(report)
+
+    print("\n[INFO] Saving daily log...")
+    all_data = fetch_all_tickers()
+    save_today_log(all_data)
+
     print("\n[INFO] Sending to Telegram...")
     send_telegram(report)
 

@@ -1,0 +1,328 @@
+{
+  "2026-03-20": [
+    {
+      "ticker": "ICBP",
+      "tx_value_bn": 39.5754,
+      "pct_change": 0.35335689045936397,
+      "vol_ratio": 0.8524330433266605
+    },
+    {
+      "ticker": "BBRI",
+      "tx_value_bn": 710.64558,
+      "pct_change": 0.0,
+      "vol_ratio": 1.347232828361963
+    },
+    {
+      "ticker": "ASII",
+      "tx_value_bn": 521.39506,
+      "pct_change": -0.8547008547008548,
+      "vol_ratio": 2.6205770909211754
+    },
+    {
+      "ticker": "BBNI",
+      "tx_value_bn": 921.104532,
+      "pct_change": 1.6203703703703702,
+      "vol_ratio": 2.716387905829276
+    },
+    {
+      "ticker": "INDF",
+      "tx_value_bn": 70.8366125,
+      "pct_change": 0.0,
+      "vol_ratio": 0.5682267519745706
+    },
+    {
+      "ticker": "BBCA",
+      "tx_value_bn": 1090.1239225,
+      "pct_change": 0.3703703703703704,
+      "vol_ratio": 1.2985074385967743
+    },
+    {
+      "ticker": "BMRI",
+      "tx_value_bn": 1300.644521,
+      "pct_change": 0.6382978723404255,
+      "vol_ratio": 1.8167889938321948
+    },
+    {
+      "ticker": "BRIS",
+      "tx_value_bn": 13.207756,
+      "pct_change": 0.0,
+      "vol_ratio": 0.3587434694200364
+    },
+    {
+      "ticker": "GOTO",
+      "tx_value_bn": 0.587708904,
+      "pct_change": -1.9230769230769231,
+      "vol_ratio": 0.0027635642124474963
+    },
+    {
+      "ticker": "ADRO",
+      "tx_value_bn": 329.923615,
+      "pct_change": 0.4098360655737705,
+      "vol_ratio": 1.1923101169549013
+    },
+    {
+      "ticker": "BYAN",
+      "tx_value_bn": 0.3289,
+      "pct_change": 0.19801980198019803,
+      "vol_ratio": 0.3629764065335753
+    },
+    {
+      "ticker": "MDKA",
+      "tx_value_bn": 231.710261,
+      "pct_change": 8.169934640522875,
+      "vol_ratio": 0.9426365102771781
+    },
+    {
+      "ticker": "ITMG",
+      "tx_value_bn": 192.5112,
+      "pct_change": 0.628930817610063,
+      "vol_ratio": 0.8620466995249302
+    },
+    {
+      "ticker": "ANTM",
+      "tx_value_bn": 427.85625,
+      "pct_change": 3.021978021978022,
+      "vol_ratio": 1.0598841266432175
+    },
+    {
+      "ticker": "PTBA",
+      "tx_value_bn": 52.834833,
+      "pct_change": -0.3424657534246575,
+      "vol_ratio": 0.27984122247718585
+    },
+    {
+      "ticker": "TINS",
+      "tx_value_bn": 96.9689,
+      "pct_change": 2.786377708978328,
+      "vol_ratio": 0.4992265684422832
+    },
+    {
+      "ticker": "INCO",
+      "tx_value_bn": 99.1998775,
+      "pct_change": 4.205607476635514,
+      "vol_ratio": 0.5589825428888268
+    },
+    {
+      "ticker": "CPIN",
+      "tx_value_bn": 118.772475,
+      "pct_change": 0.0,
+      "vol_ratio": 1.9117810572163625
+    },
+    {
+      "ticker": "HRUM",
+      "tx_value_bn": 19.4716525,
+      "pct_change": 2.5773195876288657,
+      "vol_ratio": 0.5676605088769926
+    },
+    {
+      "ticker": "JPFA",
+      "tx_value_bn": 28.776384,
+      "pct_change": 2.28310502283105,
+      "vol_ratio": 0.7002474680853383
+    },
+    {
+      "ticker": "TOWR",
+      "tx_value_bn": 14.205443,
+      "pct_change": 7.174887892376682,
+      "vol_ratio": 1.1228650978759322
+    },
+    {
+      "ticker": "MAIN",
+      "tx_value_bn": 0.919335,
+      "pct_change": 1.8292682926829267,
+      "vol_ratio": 0.29486279908086366
+    },
+    {
+      "ticker": "EXCL",
+      "tx_value_bn": 136.339376,
+      "pct_change": 15.625,
+      "vol_ratio": 1.4460337562545011
+    },
+    {
+      "ticker": "TBIG",
+      "tx_value_bn": 2.264436,
+      "pct_change": 4.516129032258064,
+      "vol_ratio": 0.43077492025825537
+    },
+    {
+      "ticker": "ISAT",
+      "tx_value_bn": 31.40892,
+      "pct_change": 6.435643564356436,
+      "vol_ratio": 0.6591797073290471
+    },
+    {
+      "ticker": "SMGR",
+      "tx_value_bn": 8.998416,
+      "pct_change": 3.7037037037037033,
+      "vol_ratio": 0.2663676855745353
+    },
+    {
+      "ticker": "KLBF",
+      "tx_value_bn": 55.1104545,
+      "pct_change": 1.5463917525773196,
+      "vol_ratio": 1.156193843188277
+    },
+    {
+      "ticker": "INTP",
+      "tx_value_bn": 2.78025,
+      "pct_change": 1.3824884792626728,
+      "vol_ratio": 0.5516330739766688
+    },
+    {
+      "ticker": "SIDO",
+      "tx_value_bn": 3.171703,
+      "pct_change": 0.0,
+      "vol_ratio": 0.5213907516773397
+    },
+    {
+      "ticker": "MIKA",
+      "tx_value_bn": 7.877376,
+      "pct_change": -0.9523809523809524,
+      "vol_ratio": 1.5150678684156835
+    },
+    {
+      "ticker": "HEAL",
+      "tx_value_bn": 18.495145,
+      "pct_change": -0.7490636704119851,
+      "vol_ratio": 1.1421721448969406
+    },
+    {
+      "ticker": "SILO",
+      "tx_value_bn": 1.81089,
+      "pct_change": -1.4598540145985401,
+      "vol_ratio": 0.512497230054482
+    },
+    {
+      "ticker": "BSDE",
+      "tx_value_bn": 7.240632,
+      "pct_change": 0.684931506849315,
+      "vol_ratio": 0.4695024975920077
+    },
+    {
+      "ticker": "PWON",
+      "tx_value_bn": 4.7525528,
+      "pct_change": 0.6024096385542169,
+      "vol_ratio": 0.387201021419162
+    },
+    {
+      "ticker": "LPKR",
+      "tx_value_bn": 8.063209,
+      "pct_change": 5.47945205479452,
+      "vol_ratio": 0.5613511324050404
+    },
+    {
+      "ticker": "ESSA",
+      "tx_value_bn": 55.152126,
+      "pct_change": -0.6711409395973155,
+      "vol_ratio": 0.278284068187716
+    },
+    {
+      "ticker": "SMRA",
+      "tx_value_bn": 8.781112,
+      "pct_change": 3.6585365853658534,
+      "vol_ratio": 0.8618609158548663
+    },
+    {
+      "ticker": "AKRA",
+      "tx_value_bn": 12.4026925,
+      "pct_change": -1.556420233463035,
+      "vol_ratio": 0.3773357620550588
+    },
+    {
+      "ticker": "CTRA",
+      "tx_value_bn": 5.5054135,
+      "pct_change": 0.7352941176470588,
+      "vol_ratio": 0.36600999422096675
+    },
+    {
+      "ticker": "PGAS",
+      "tx_value_bn": 112.383537,
+      "pct_change": 3.10077519379845,
+      "vol_ratio": 0.719603979317035
+    },
+    {
+      "ticker": "ELSA",
+      "tx_value_bn": 55.8540225,
+      "pct_change": -1.4184397163120568,
+      "vol_ratio": 0.3263421598189924
+    },
+    {
+      "ticker": "MTEL",
+      "tx_value_bn": 8.5073025,
+      "pct_change": 5.9405940594059405,
+      "vol_ratio": 1.5344850213649646
+    },
+    {
+      "ticker": "FILM",
+      "tx_value_bn": 15.381127,
+      "pct_change": -4.749340369393139,
+      "vol_ratio": 0.7537099966920043
+    },
+    {
+      "ticker": "ACES",
+      "tx_value_bn": 9.8828366,
+      "pct_change": 0.5263157894736842,
+      "vol_ratio": 0.5150106002846649
+    },
+    {
+      "ticker": "MEDC",
+      "tx_value_bn": 249.44112,
+      "pct_change": 2.857142857142857,
+      "vol_ratio": 0.45265634569102475
+    },
+    {
+      "ticker": "MAPI",
+      "tx_value_bn": 13.2901665,
+      "pct_change": 2.314814814814815,
+      "vol_ratio": 0.6527157823900839
+    },
+    {
+      "ticker": "LPPF",
+      "tx_value_bn": 3.048848,
+      "pct_change": 3.6011080332409975,
+      "vol_ratio": 0.39739489899383823
+    },
+    {
+      "ticker": "WIIM",
+      "tx_value_bn": 10.36296,
+      "pct_change": 8.356545961002785,
+      "vol_ratio": 0.9281874213880305
+    },
+    {
+      "ticker": "HMSP",
+      "tx_value_bn": 15.629446,
+      "pct_change": 1.3888888888888888,
+      "vol_ratio": 0.5009013097943891
+    },
+    {
+      "ticker": "GGRM",
+      "tx_value_bn": 8.4378,
+      "pct_change": -2.608695652173913,
+      "vol_ratio": 0.9658499062515024
+    },
+    {
+      "ticker": "AMRT",
+      "tx_value_bn": 50.9817675,
+      "pct_change": 1.7605633802816902,
+      "vol_ratio": 1.000983918549248
+    },
+    {
+      "ticker": "MIDI",
+      "tx_value_bn": 2.78622,
+      "pct_change": 5.343511450381679,
+      "vol_ratio": 0.4894872966045728
+    },
+    {
+      "ticker": "TLKM",
+      "tx_value_bn": 502.770235,
+      "pct_change": 3.040540540540541,
+      "vol_ratio": 1.115545292670871
+    },
+    {
+      "ticker": "UNVR",
+      "tx_value_bn": 101.1884,
+      "pct_change": 7.816711590296496,
+      "vol_ratio": 2.651148508584208
+    }
+  ]
+}
