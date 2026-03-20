@@ -331,6 +331,96 @@ def generate_big_player_insight(all_data: list[dict], unusual: list[dict]) -> st
 
     return "\n".join(L)
 
+def bandar_detector(df_all: list[dict], df_idx: pd.DataFrame) -> pd.DataFrame:
+    df = pd.DataFrame(df_all)
+
+    if df.empty:
+        return df
+
+    # merge foreign
+    if not df_idx.empty and "net_foreign_bn" in df_idx.columns:
+        df = df.merge(df_idx[["ticker", "net_foreign_bn"]], on="ticker", how="left")
+    else:
+        df["net_foreign_bn"] = 0
+
+    df["net_foreign_bn"] = df["net_foreign_bn"].fillna(0)
+    df["sector"] = df["ticker"].map(SECTOR_MAP).fillna("Other")
+
+    scores, phases, signals = [], [], []
+
+    for _, r in df.iterrows():
+        score = 0
+
+        # ── scoring ──
+        if r["tx_value_bn"] > 150:
+            score += 2
+        if r["vol_ratio"] > 1.5:
+            score += 2
+        if abs(r["pct_change"]) < 2:
+            score += 2
+        if r["net_foreign_bn"] > 0:
+            score += 2
+
+        # ── phase ──
+        if r["pct_change"] < 2 and r["tx_value_bn"] > 150:
+            phase = "AKUMULASI"
+        elif r["pct_change"] > 5:
+            phase = "MARKUP"
+        elif r["pct_change"] > 2 and r["net_foreign_bn"] < 0:
+            phase = "DISTRIBUSI"
+        elif r["pct_change"] < -3:
+            phase = "MARKDOWN"
+        else:
+            phase = "NEUTRAL"
+
+        # ── divergence ──
+        signal = ""
+        if r["pct_change"] > 3 and r["net_foreign_bn"] < 0:
+            signal = "FAKE BREAKOUT"
+        elif r["pct_change"] < 1 and r["net_foreign_bn"] > 0:
+            signal = "HIDDEN ACCUMULATION"
+
+        scores.append(score)
+        phases.append(phase)
+        signals.append(signal)
+
+    df["score"] = scores
+    df["phase"] = phases
+    df["signal"] = signals
+
+    return df.sort_values("score", ascending=False)
+
+def build_bandar_section(df: pd.DataFrame) -> list[str]:
+    if df.empty:
+        return ["🔥 *BANDAR DETECTOR*", "_Data tidak tersedia_"]
+
+    lines = ["🔥 *BANDAR DETECTOR*"]
+
+    top = df.head(7)
+
+    for _, r in top.iterrows():
+        lines.append(
+            f"\n`{r['ticker']}` | Score {r['score']}/10"
+        )
+        lines.append(
+            f"  → {r['phase']} | {r['pct_change']:+.1f}%"
+        )
+        lines.append(
+            f"  → Val {r['tx_value_bn']:.1f}B | Foreign {r['net_foreign_bn']:+.1f}B"
+        )
+
+        if r["signal"]:
+            lines.append(f"  ⚠️ {r['signal']}")
+
+    # ── sector flow ──
+    sector_flow = df.groupby("sector")["net_foreign_bn"].sum().sort_values(ascending=False)
+
+    lines.append("\n🔄 *Sector Flow (Foreign)*")
+    for s, v in sector_flow.head(3).items():
+        lines.append(f"- {s}: {v:.1f}B")
+
+    return lines
+
 
 def build_report() -> str:
     """Assemble the full screening report."""
@@ -430,6 +520,10 @@ def build_report() -> str:
 
     # ── Big Player Insight analysis (appended below raw data) ─────────────────
     lines.append(generate_big_player_insight(all_data, unusual))
+    # ── BANDAR DETECTOR (NEW) ───────────────────────────────
+    df_bandar = bandar_detector(all_data, df_idx)
+    lines += ["", "---", ""]
+    lines += build_bandar_section(df_bandar)
 
     return "\n".join(lines)
 

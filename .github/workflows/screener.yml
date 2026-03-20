@@ -2,8 +2,8 @@ name: IDX Daily Screener
 
 on:
   schedule:
-    # 09:30 UTC = 16:30 WIB (UTC+7), Mon–Fri
-    - cron: "30 11 * * 1-5"
+    # 05:00 UTC = 12:00 WIB (UTC+7), Mon–Fri
+    - cron: "0 5 * * 1-5"
   workflow_dispatch:  # allow manual trigger from GitHub UI
 
 jobs:
